@@ -3,10 +3,8 @@ parameters:
     paths:
         - src
         - tests
+        - test.php
     checkBenevolentUnionTypes: true
-    # ignoreErrors:
-    #     -
-    #         identifier: missingType.generics
     editorUrl: '=>'
     editorUrlTitle: '%%file%%:%%line%%'
     tmpDir: ./var/phpstan
