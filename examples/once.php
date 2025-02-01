@@ -7,7 +7,7 @@ require_once __DIR__.'/../vendor/autoload.php';
 use Thesis\Cron;
 
 $scheduler = (new Cron\Scheduler())
-    ->schedule('* * * * * *', var_dump(...));
+    ->schedule('* * * * * *', Cron\task(var_dump(...))->once());
 
 $scheduler->run();
 

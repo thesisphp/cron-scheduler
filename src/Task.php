@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Thesis\Cron;
 
 /**
- * @phpstan-type Execution = callable(\DateTimeImmutable): void
+ * @phpstan-type Execution = callable(\DateTimeImmutable, positive-int): void
  */
 final class Task
 {
@@ -15,11 +15,12 @@ final class Task
     /**
      * @internal
      * @param Execution $f
+     * @param -1|positive-int $times
      */
     public function __construct(
         callable $f,
         public readonly bool $reference = true,
-        public readonly bool $once = false,
+        public readonly int $times = -1,
         public readonly ?Runner $runner = null,
     ) {
         $this->f = $f;
@@ -30,15 +31,26 @@ final class Task
         return new self(
             f: $this->f,
             reference: false,
+            times: $this->times,
+            runner: $this->runner,
         );
     }
 
     public function once(): self
     {
+        return $this->exactly(1);
+    }
+
+    /**
+     * @param positive-int $times
+     */
+    public function exactly(int $times): self
+    {
         return new self(
             f: $this->f,
             reference: $this->reference,
-            once: true,
+            times: $times,
+            runner: $this->runner,
         );
     }
 
@@ -47,25 +59,26 @@ final class Task
         return new self(
             f: $this->f,
             reference: $this->reference,
-            once: $this->once,
+            times: $this->times,
             runner: $runner,
         );
     }
 
     /**
      * @internal
+     * @param positive-int $epoch
      */
-    public function execute(\DateTimeImmutable $time): void
+    public function execute(\DateTimeImmutable $time, int $epoch): void
     {
-        $this->runner?->run(function () use ($time): void {
-            ($this->f)($time);
+        $this->runner?->run(function () use ($time, $epoch): void {
+            ($this->f)($time, $epoch);
         });
     }
 }
 
 /**
  * @api
- * @param callable(\DateTimeImmutable): void $f
+ * @param callable(\DateTimeImmutable, positive-int): void $f
  */
 function task(callable $f): Task
 {

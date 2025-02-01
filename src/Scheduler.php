@@ -37,11 +37,6 @@ final class Scheduler
         $this->cancellation = new DeferredCancellation();
     }
 
-    public function __destruct()
-    {
-        $this->stop();
-    }
-
     public function onRunner(Runner $runner): self
     {
         $scheduler = clone $this;
@@ -71,7 +66,7 @@ final class Scheduler
     }
 
     public function run(
-        \DateTimeImmutable $time = new \DateTimeImmutable(datetime: 'NOW', timezone: new \DateTimeZone('UTC')),
+        \DateTimeImmutable $time = new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')),
         ?Cancellation $cancellation = null,
     ): void {
         if ($this->state !== self::SCHEDULER_STATE_PENDING) {
@@ -85,6 +80,7 @@ final class Scheduler
             EventLoop::queue(function () use ($schedule, $task, $time): void {
                 $cancellation = $this->cancellation?->getCancellation();
 
+                $epoch = 0;
                 foreach ($schedule->iterator($time) as $tick) {
                     $suspension = EventLoop::getSuspension();
                     $timerId = EventLoop::delay($tick->getTimestamp() - $time->getTimestamp(), $suspension->resume(...));
@@ -96,7 +92,7 @@ final class Scheduler
 
                     try {
                         $suspension->suspend();
-                        $task->execute($tick);
+                        $task->execute($tick, ++$epoch);
                     } catch (CancelledException) {
                         return;
                     } finally {
@@ -107,7 +103,7 @@ final class Scheduler
                         }
                     }
 
-                    if ($task->once) {
+                    if ($task->times !== -1 && $task->times <= $epoch) {
                         return;
                     }
 

@@ -7,7 +7,10 @@ require_once __DIR__.'/../vendor/autoload.php';
 use Thesis\Cron;
 
 $scheduler = (new Cron\Scheduler())
-    ->schedule('* * * * * *', var_dump(...));
+    ->schedule('* * * * * *', Cron\task(static function (\DateTimeImmutable $time, int $epoch): void {
+        dump($time, $epoch);
+    })
+        ->exactly(2));
 
 $scheduler->run();
 
