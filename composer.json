@@ -1,6 +1,6 @@
 {
     "name": "thesis/cron-scheduler",
-    "description": "Async (fiber based) task scheduler with cron expression support.",
+    "description": "Concurrent (fiber based) task scheduler with cron expression support.",
     "license": "MIT",
     "type": "library",
     "authors": [

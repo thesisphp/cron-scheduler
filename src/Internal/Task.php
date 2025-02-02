@@ -50,7 +50,7 @@ final class Task
 
             try {
                 $suspension->suspend();
-                $this->execute($time, ++$epoch);
+                $this->execute($tick, ++$epoch);
             } catch (CancelledException) {
                 return;
             } finally {
