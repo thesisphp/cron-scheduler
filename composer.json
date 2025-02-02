@@ -34,7 +34,7 @@
             "Thesis\\Cron\\": "src/"
         },
         "files": [
-            "src/Task.php"
+            "src/Run.php"
         ]
     },
     "autoload-dev": {

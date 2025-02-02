@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Thesis\Cron;
 
 use Amp\Cancellation;
-use Amp\CancelledException;
 use Amp\DeferredCancellation;
 use Revolt\EventLoop;
 
 /**
  * @api
- * @phpstan-import-type Execution from Task
+ * @phpstan-import-type Execution from Run
  */
 final class Scheduler
 {
@@ -27,7 +26,7 @@ final class Scheduler
 
     private ?DeferredCancellation $cancellation;
 
-    /** @var list<array{Time, Task}> */
+    /** @var list<array{Time, Internal\Task}> */
     private array $tasks = [];
 
     public function __construct(?Parser $parser = null)
@@ -47,20 +46,24 @@ final class Scheduler
 
     /**
      * @param non-empty-string $cron
-     * @param Execution|Task $task
+     * @param Execution|Run $run
      * @throws ParserException
      */
-    public function schedule(string $cron, callable|Task $task): self
+    public function schedule(string $cron, callable|Run $run): self
     {
         $time = $this->parser->parse($cron);
 
-        $task = \is_callable($task) ? new Task($task) : $task;
-        if ($task->runner === null) {
-            $task = $task->onRunner($this->runner);
+        if (\is_callable($run)) {
+            $run = new Run($run);
         }
 
         $scheduler = clone $this;
-        $scheduler->tasks[] = [$time, $task];
+        $scheduler->tasks[] = [$time, new Internal\Task(
+            execution: $run->execution(),
+            times: $run->times,
+            reference: $run->reference,
+            runner: $run->runner ?: $this->runner,
+        )];
 
         return $scheduler;
     }
@@ -77,39 +80,7 @@ final class Scheduler
         $cancellation?->subscribe($this->stop(...));
 
         foreach ($this->tasks as [$schedule, $task]) {
-            EventLoop::queue(function () use ($schedule, $task, $time): void {
-                $cancellation = $this->cancellation?->getCancellation();
-
-                $epoch = 0;
-                foreach ($schedule->iterator($time) as $tick) {
-                    $suspension = EventLoop::getSuspension();
-                    $timerId = EventLoop::delay($tick->getTimestamp() - $time->getTimestamp(), $suspension->resume(...));
-                    $cancellationId = $cancellation?->subscribe($suspension->throw(...));
-
-                    if (!$task->reference) {
-                        EventLoop::unreference($timerId);
-                    }
-
-                    try {
-                        $suspension->suspend();
-                        $task->execute($tick, ++$epoch);
-                    } catch (CancelledException) {
-                        return;
-                    } finally {
-                        EventLoop::cancel($timerId);
-
-                        if ($cancellationId !== null) {
-                            $cancellation?->unsubscribe($cancellationId);
-                        }
-                    }
-
-                    if ($task->times !== -1 && $task->times <= $epoch) {
-                        return;
-                    }
-
-                    $time = $tick;
-                }
-            });
+            EventLoop::queue($task->run(...), $schedule->iterator($time), $time, $this->cancellation->getCancellation());
         }
 
         $this->state = self::SCHEDULER_STATE_RUN;
