@@ -26,7 +26,7 @@ final class Scheduler
 
     private ?DeferredCancellation $cancellation;
 
-    /** @var list<array{Time, Internal\Task}> */
+    /** @var list<Internal\Task> */
     private array $tasks = [];
 
     public function __construct(?Parser $parser = null)
@@ -51,19 +51,20 @@ final class Scheduler
      */
     public function schedule(string $cron, callable|Run $run): self
     {
-        $time = $this->parser->parse($cron);
+        $schedule = $this->parser->parse($cron);
 
         if (\is_callable($run)) {
             $run = new Run($run);
         }
 
         $scheduler = clone $this;
-        $scheduler->tasks[] = [$time, new Internal\Task(
+        $scheduler->tasks[] = new Internal\Task(
             execution: $run->execution(),
+            schedule: $schedule,
             times: $run->times,
             reference: $run->reference,
             runner: $run->runner ?: $this->runner,
-        )];
+        );
 
         return $scheduler;
     }
@@ -72,15 +73,15 @@ final class Scheduler
         \DateTimeImmutable $time = new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')),
         ?Cancellation $cancellation = null,
     ): void {
-        if ($this->state !== self::SCHEDULER_STATE_PENDING) {
+        if ($this->state !== self::SCHEDULER_STATE_PENDING || \count($this->tasks) === 0) {
             return;
         }
 
         $this->cancellation ??= new DeferredCancellation();
         $cancellation?->subscribe($this->stop(...));
 
-        foreach ($this->tasks as [$schedule, $task]) {
-            EventLoop::queue($task->run(...), $schedule->iterator($time), $time, $this->cancellation->getCancellation());
+        foreach ($this->tasks as $task) {
+            EventLoop::queue($task->run(...), $time, $this->cancellation->getCancellation());
         }
 
         $this->state = self::SCHEDULER_STATE_RUN;

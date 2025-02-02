@@ -9,6 +9,7 @@ use Amp\CancelledException;
 use Revolt\EventLoop;
 use Thesis\Cron\Run;
 use Thesis\Cron\Runner;
+use Thesis\Cron\Time;
 
 /**
  * @internal
@@ -25,6 +26,7 @@ final class Task
      */
     public function __construct(
         callable $execution,
+        private readonly Time $schedule,
         private readonly int $times,
         private readonly bool $reference,
         private readonly Runner $runner,
@@ -32,16 +34,12 @@ final class Task
         $this->execution = $execution;
     }
 
-    /**
-     * @param \Traversable<\DateTimeImmutable> $ticks
-     */
     public function run(
-        \Traversable $ticks,
         \DateTimeImmutable $time,
         ?Cancellation $cancellation = null,
     ): void {
         $epoch = 0;
-        foreach ($ticks as $tick) {
+        foreach ($this->schedule->iterator($time) as $tick) {
             $suspension = EventLoop::getSuspension();
             $timerId = EventLoop::delay($tick->getTimestamp() - $time->getTimestamp(), $suspension->resume(...));
             $cancellationId = $cancellation?->subscribe($suspension->throw(...));
