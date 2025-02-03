@@ -7,7 +7,7 @@ namespace Thesis\Cron;
 /**
  * @api
  */
-final class SyncRunner implements Runner
+final class BlockingRunner implements Runner
 {
     public function run(\Closure $task): void
     {
